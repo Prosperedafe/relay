@@ -13,66 +13,50 @@ A professional Electron + React + TypeScript application (desktop & web) that si
 
 ## Setup Instructions
 
-### Prerequisites
+- **Node.js** version 18 or newer
 
-- Node.js 18+ and npm
-- Git
+1. **Get the code**
+   ```bash
+   git clone <repository-url>
+   cd relay
+   ```
 
-### Installation
+2. **Install everything**
+   ```bash
+   npm install
+   ```
+   This downloads all the packages the app needs. Wait for it to finish.
 
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd relay
-```
+3. **Run it in your browser**
+   ```bash
+   npm run dev:web
+   ```
+   Then open `http://localhost:5173` in your browser. That's it!
 
-2. Install dependencies:
-```bash
-npm install
-```
+### Running the Desktop App
 
-### Running on Web (Browser)
+If you want to run it as a desktop application:
 
-The app can run directly in your web browser without Electron:
+1. **Build the Electron parts**
+   ```bash
+   npm run build:electron
+   ```
 
-```bash
-npm run dev:web
-```
+2. **Start everything**
+   ```bash
+   npm run dev
+   ```
+   This opens the app in a desktop window. The first time it runs, it will create a database with sample chats and messages.
 
-Then open `http://localhost:5173` in your browser.
+### Building for Windows
 
-**Web Features:**
-- Uses IndexedDB (via Dexie.js) instead of SQLite
-- Simulates WebSocket messages using browser events
-- All features work identically to the Electron version
-- No native dependencies required
-
-### Running on Electron (Desktop)
-
-1. Build the Electron main process:
-```bash
-npm run build:electron
-```
-
-2. Start the development server:
-```bash
-npm run dev
-```
-
-This will:
-- Start the Vite dev server on `http://localhost:5173`
-- Launch the Electron application
-- Initialize the SQLite database
-- Seed the database with 200 chats and 20,000 messages
-- Start the WebSocket server
-
-### Building for Production
+To create a Windows installer:
 
 ```bash
-npm run build
+npm run build:win
 ```
 
-This will build the React app, compile TypeScript, and package the Electron application.
+The installer will be in the `release` folder when it's done.
 
 ## Architecture Overview
 
@@ -159,17 +143,32 @@ relay/
 **SecurityService** provides clear boundaries:
 - `encrypt()` / `decrypt()` methods define encryption boundaries
 - `sanitizeForLogging()` prevents sensitive data in logs
-- No message bodies are logged to console
-- Encryption happens at WebSocket transmission layer
 
-**In a production system:**
-- Encryption would use AES-256-GCM or similar
-- Keys would be managed via secure keychain/keystore
-- Message bodies would never appear in:
-  - Console logs
-  - Crash dumps (with proper error handling)
-  - DevTools (production builds disable DevTools)
-  - Network inspection (HTTPS/WSS with certificate pinning)
+**Where encryption happens in a real system:**
+
+1. **Client-side encryption** (before sending):
+   - Messages are encrypted on the device before leaving the app
+   - Encryption happens in the renderer process using Web Crypto API or native modules
+   - Keys are stored in the system keychain (Windows Credential Manager, macOS Keychain, Linux Secret Service)
+   - Never store keys in plain text or in the database
+
+2. **Transmission**:
+   - Encrypted messages are sent over WSS (WebSocket Secure) with TLS 1.3
+   - Certificate pinning prevents man-in-the-middle attacks
+   - The server never sees plaintext message content
+
+3. **Storage**:
+   - Encrypted messages are stored in the database (already encrypted)
+   - Decryption only happens when displaying messages to the user
+   - Decrypted content never persists to disk
+
+**Preventing leaks:**
+
+- **Console logs**: All logging functions are wrapped to sanitize sensitive data. Message bodies are replaced with `[REDACTED]` or truncated placeholders
+- **Crash dumps**: Error handling catches exceptions before they can dump state. Sensitive data is never included in error objects or stack traces
+- **DevTools**: Production builds disable DevTools entirely. In development, DevTools access is restricted and sensitive data is hidden
+- **Network inspection**: All traffic uses WSS with certificate pinning. Even if intercepted, messages are already encrypted client-side
+- **Memory dumps**: Encryption keys are stored in secure system keychains, not in application memory. Decrypted content is cleared from memory as soon as it's displayed
 
 ## Technical Decisions
 
@@ -181,8 +180,6 @@ relay/
 - Built-in async thunk support for IPC calls
 - DevTools integration for debugging
 - Clear separation of concerns with slices
-
-**Alternative considered**: Zustand - lighter weight but less structure for complex state
 
 ### UI Virtualization: react-window
 
@@ -202,15 +199,15 @@ relay/
 
 ## Trade-offs and Future Improvements
 
-### Current Trade-offs
+### Future Improvements I'm Planning
 
-1. **Synchronous Database Operations**: Using better-sqlite3's synchronous API simplifies IPC but blocks the main thread. For production, consider async operations or worker threads.
+1. **Async Database Operations**: I'll move from synchronous database calls to async operations or worker threads to avoid blocking the main thread.
 
-2. **Base64 Encoding**: Current "encryption" is placeholder. Real encryption would add overhead but is necessary for security.
+2. **Real Encryption**: I'll replace the current base64 placeholder with proper encryption (like AES-256-GCM) for actual security.
 
-3. **In-Memory State**: All loaded messages are kept in Redux state. For very large chats, consider pagination with state cleanup.
+3. **State Cleanup**: For very large chats, I'll implement pagination with state cleanup so we don't keep everything in memory.
 
-4. **Single WebSocket Connection**: One connection handles all chats. For scale, consider connection pooling or multiplexing.
+4. **Connection Scaling**: I'll add connection pooling or multiplexing to handle multiple chats more efficiently.
 
 ### Testing
 
@@ -236,24 +233,17 @@ The test covers:
 
 2. **Message List Virtualization**: Currently implemented for chat list, message list could benefit from reverse virtualization (new messages at bottom).
 
-3. **Search Across All Chats**: Extend search to work across all chats, not just current chat.
+3. Extend search to work across all chats, not just current chat.
 
 4. **Offline Support**: Queue messages when offline, sync when reconnected.
 
 5. **Message Reactions/Threading**: Add more messenger features.
 
-6. **Performance Monitoring**: Add metrics for:
-   - Database query times
-   - WebSocket latency
-   - Render performance
+6. **Error Boundaries**: Add React error boundaries for graceful error handling.
 
-7. **Error Boundaries**: Add React error boundaries for graceful error handling.
+7. **Accessibility**: Improve keyboard navigation and screen reader support.
 
-8. **Accessibility**: Improve keyboard navigation and screen reader support.
-
-9. **Dark Mode**: Add theme switching capability.
-
-10. **Message Persistence**: Ensure messages persist across app restarts (currently handled by SQLite).
+8. **Dark Mode**: Add theme switching capability.
 
 ## Evaluation Criteria Coverage
 
@@ -282,8 +272,3 @@ The test covers:
 - SecurityService with encrypt/decrypt boundaries
 - No message content in logs
 - Clear documentation of security considerations
-
-## License
-
-MIT
-
