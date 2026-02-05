@@ -11,7 +11,7 @@ interface WebSocketState {
   lastHeartbeat: number | null;
 }
 
-const initialState: WebSocketState = {
+export const initialState: WebSocketState = {
   state: 'offline',
   port: null,
   reconnectAttempts: 0,

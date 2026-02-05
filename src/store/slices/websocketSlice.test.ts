@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import websocketReducer, { setConnectionState, setReconnectAttempts, setLastHeartbeat, setPort, initialState } from './websocketSlice';
-import type { ConnectionState } from './websocketSlice';
 
 describe('websocketSlice reducers', () => {
   it('should set connection state to connected', () => {
