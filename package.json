@@ -1,0 +1,71 @@
+{
+  "name": "relay",
+  "version": "1.0.0",
+  "description": "Relay - Chat List + Sync Simulator",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "npm run build:electron && concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
+    "dev:web": "vite",
+    "dev:vite": "vite",
+    "dev:electron": "wait-on http://localhost:5173 && electron .",
+    "build": "npm run build:electron && tsc && vite build && electron-builder",
+    "build:electron": "tsc -p electron",
+    "build:win": "npm run build:electron && tsc && vite build && electron-builder --win --x64",
+    "test": "vitest",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/node": "^20.10.6",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@types/react-window": "^1.8.8",
+    "@types/ws": "^8.5.10",
+    "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/ui": "^4.0.18",
+    "concurrently": "^8.2.2",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "jsdom": "^28.0.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8",
+    "vitest": "^4.0.18",
+    "wait-on": "^7.2.0"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/material": "^7.3.7",
+    "@reduxjs/toolkit": "^2.0.1",
+    "better-sqlite3": "^9.2.2",
+    "dexie": "^3.2.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-redux": "^9.0.4",
+    "react-window": "^1.8.10",
+    "ws": "^8.16.0"
+  },
+  "build": {
+    "appId": "com.relay.securemessenger",
+    "productName": "Relay",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
