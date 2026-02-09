@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { addMessage } from './databaseSlice';
+import { addMessage, clearMessages, loadMessages } from './databaseSlice';
 import { Message } from './databaseSlice';
+import { decrypt } from '../../services/security';
 
 export type ConnectionState = 'connected' | 'reconnecting' | 'offline';
 
@@ -41,13 +42,17 @@ export const connectWebSocket = createAsyncThunk(
           clearInterval(heartbeatInterval);
         }
         heartbeatInterval = window.setInterval(() => {
-          dispatch(setLastHeartbeat(Date.now()));
+          const state = getState() as any;
+          const last = state.websocket.lastHeartbeat;
+          if (last && Date.now() - last > 30000) {
+            dispatch(setConnectionState('offline'));
+          }
         }, 10000);
 
         const messageHandler = (event: CustomEvent) => {
           try {
             const data = event.detail;
-            const decryptedBody = atob(data.body);
+            const decryptedBody = decrypt(data.body);
             const message: Message = {
               id: data.messageId,
               chatId: data.chatId,
@@ -58,6 +63,7 @@ export const connectWebSocket = createAsyncThunk(
             const state = getState() as any;
             const isSelected = state.ui.selectedChatId === data.chatId;
             dispatch(addMessage({ chatId: data.chatId, message, isSelected }));
+            dispatch(setLastHeartbeat(Date.now()));
           } catch (error) {
             console.error('Error processing message:', error);
           }
@@ -97,8 +103,10 @@ export const connectWebSocket = createAsyncThunk(
               clearInterval(heartbeatInterval);
             }
             heartbeatInterval = window.setInterval(() => {
-              if (ws && ws.readyState === WebSocket.OPEN) {
-                dispatch(setLastHeartbeat(Date.now()));
+              const state = getState() as any;
+              const last = state.websocket.lastHeartbeat;
+              if (last && Date.now() - last > 30000 && ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
               }
             }, 10000);
 
@@ -108,7 +116,7 @@ export const connectWebSocket = createAsyncThunk(
           ws.onmessage = (event) => {
             try {
               const data = JSON.parse(event.data);
-              const decryptedBody = atob(data.body);
+              const decryptedBody = decrypt(data.body);
               const message: Message = {
                 id: data.messageId,
                 chatId: data.chatId,
@@ -119,6 +127,7 @@ export const connectWebSocket = createAsyncThunk(
               const state = getState() as any;
               const isSelected = state.ui.selectedChatId === data.chatId;
               dispatch(addMessage({ chatId: data.chatId, message, isSelected }));
+              dispatch(setLastHeartbeat(Date.now()));
             } catch (error) {
               console.error('Error processing message:', error);
             }

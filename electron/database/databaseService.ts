@@ -43,7 +43,25 @@ export class DatabaseService {
 
       CREATE INDEX IF NOT EXISTS idx_chats_lastMessageAt ON chats(lastMessageAt DESC);
       CREATE INDEX IF NOT EXISTS idx_messages_chatId_ts ON messages(chatId, ts DESC);
-      CREATE INDEX IF NOT EXISTS idx_messages_body ON messages(body);
+
+      CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+        body,
+        content='messages',
+        content_rowid='id'
+      );
+
+      CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN
+        INSERT INTO messages_fts(rowid, body) VALUES (new.id, new.body);
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS messages_ad AFTER DELETE ON messages BEGIN
+        INSERT INTO messages_fts(messages_fts, rowid, body) VALUES('delete', old.id, old.body);
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
+        INSERT INTO messages_fts(messages_fts, rowid, body) VALUES('delete', old.id, old.body);
+        INSERT INTO messages_fts(rowid, body) VALUES (new.id, new.body);
+      END;
     `);
   }
 
@@ -136,8 +154,15 @@ export class DatabaseService {
   searchMessages(chatId: number, query: string): Message[] {
     if (!this.db) throw new Error('Database not initialized');
     return this.db
-      .prepare('SELECT * FROM messages WHERE chatId = ? AND body LIKE ? ORDER BY ts DESC LIMIT 50')
-      .all(chatId, `%${query}%`) as Message[];
+      .prepare(`
+        SELECT m.*
+        FROM messages m
+        JOIN messages_fts f ON m.id = f.rowid
+        WHERE m.chatId = ? AND f.body MATCH ?
+        ORDER BY m.ts DESC
+        LIMIT 50
+      `)
+      .all(chatId, `${query}*`) as Message[];
   }
 
   addMessage(chatId: number, messageId: number, ts: number, sender: string, body: string): void {

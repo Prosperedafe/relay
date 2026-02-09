@@ -1,4 +1,5 @@
 import { webDatabase } from './webDatabase';
+import { encrypt } from './security';
 
 class WebWebSocketServer {
   private port: number;
@@ -38,7 +39,7 @@ class WebWebSocketServer {
             messageId,
             ts,
             sender,
-            body: btoa(body),
+            body: encrypt(body),
           },
         });
         window.dispatchEvent(event);
